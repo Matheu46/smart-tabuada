@@ -4,6 +4,7 @@
 #include <string.h>
 #include "inc/ssd1306.h"
 #include "hardware/i2c.h"
+#include <time.h>
 
 // I2C defines
 // This example will use I2C0 on GPIO8 (SDA) and GPIO9 (SCL) running at 400KHz.
@@ -21,21 +22,6 @@ void init_oled() {
     gpio_pull_up(I2C_SCL);
 
     ssd1306_init();
-
-    // Preparar área de renderização para o display (ssd1306_width pixels por ssd1306_n_pages páginas)
-    struct render_area frame_area = {
-        start_column : 0,
-        end_column : ssd1306_width - 1,
-        start_page : 0,
-        end_page : ssd1306_n_pages - 1
-    };
-
-    calculate_render_area_buffer_length(&frame_area);
-
-    // zera o display inteiro
-    uint8_t ssd[ssd1306_buffer_length];
-    memset(ssd, 0, ssd1306_buffer_length);
-    render_on_display(ssd, &frame_area);
 }
 
 // Função para exibir mensagem no OLED
@@ -58,16 +44,16 @@ void display_message(char *line1, char *line2) {
     render_on_display(ssd, &frame_area);
 }
 
-void gerar_pergunta() {
-    int opcoes[3];
-    int num1 = (rand() % 10) + 1;
-    int num2 = (rand() % 10) + 1;
-    int resultado = (num1) * (num2);
 
-    int opcao_correta = rand() % 3;
+void gerar_pergunta(int *num1, int *num2, int *opcao_correta, int opcoes[3]) {
+    *num1 = (rand() % 10) + 1;
+    *num2 = (rand() % 10) + 1;
+    int resultado = (*num1) * (*num2);
+
+    *opcao_correta = rand() % 3;
 
     for (int i = 0; i < 3; i++) {
-        if (i == opcao_correta) {
+        if (i == *opcao_correta) {
             opcoes[i] = resultado;
         } else {
             int opcao_errada;
@@ -77,7 +63,6 @@ void gerar_pergunta() {
             opcoes[i] = opcao_errada;
         }
     }
-
 }
 
 int main()
@@ -94,11 +79,42 @@ int main()
     // For more examples of I2C use see https://github.com/raspberrypi/pico-examples/tree/master/i2c
 
     init_oled();
+    // Preparar área de renderização para o display (ssd1306_width pixels por ssd1306_n_pages páginas)
+    struct render_area frame_area = {
+        start_column : 0,
+        end_column : ssd1306_width - 1,
+        start_page : 0,
+        end_page : ssd1306_n_pages - 1
+    };
 
-    display_message("Iniciando", "Wi-Fi...");
+    calculate_render_area_buffer_length(&frame_area);
+
+    // zera o display inteiro
+    uint8_t ssd[ssd1306_buffer_length];
+    memset(ssd, 0, ssd1306_buffer_length);
+    render_on_display(ssd, &frame_area);
+
+    display_message("Tabuada", "Carregando...");
+
+    srand(time(NULL));
 
     while (true) {
-        printf("Hello, world!\n");
-        sleep_ms(1000);
+        int num1, num2, opcao_correta, opcoes[3];
+        gerar_pergunta(&num1, &num2, &opcao_correta, opcoes);
+
+        char question[16], options[16];
+        snprintf(question, sizeof(question), "%d x %d =", num1, num2);
+        snprintf(options, sizeof(options), "%d %d %d", opcoes[0], opcoes[1], opcoes[2]);
+
+        display_message(question, options);
+
+        sleep_ms(3000);
+
+        // zera o display inteiro
+        uint8_t ssd[ssd1306_buffer_length];
+        memset(ssd, 0, ssd1306_buffer_length);
+        render_on_display(ssd, &frame_area);
     }
+
+    return 0;
 }
