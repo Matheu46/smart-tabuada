@@ -1,3 +1,6 @@
+// Tirar tabuada de 1
+// diminuir range da resposta errada (5 para mais e 5 para menos)
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
@@ -248,6 +251,20 @@ int main()
 
     srand(time(NULL));
 
+    bool iniciar = false;
+
+    while(!iniciar) {
+        display_message("Tabuada de multiplicação", "Aperte A para começar");
+        if (!gpio_get(BUTTON_A)) { // A for pressionado
+            iniciar = true;
+        }
+    }
+
+    ssd[ssd1306_buffer_length];
+    memset(ssd, 0, ssd1306_buffer_length);
+    render_on_display(ssd, &frame_area);
+    sleep_ms(300); // não dar conflito com a pergunta
+
     while (true) {
         // checar botões para para a escolha da resposta
         bool button_a_state = gpio_get(BUTTON_A);
@@ -267,11 +284,11 @@ int main()
         int escolha = -1;
 
         while(!resposta) {
-            if (!gpio_get(BUTTON_A)) { // Se o botão A for pressionado
+            if (!gpio_get(BUTTON_A)) { // A for pressionado
                 escolha = 0;
                 resposta = true;
             }
-            if (!gpio_get(BUTTON_B)) { // Se o botão B for pressionado
+            if (!gpio_get(BUTTON_B)) { // B for pressionado
                 escolha = 1;
                 resposta = true;
             }
