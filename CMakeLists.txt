@@ -44,10 +44,6 @@ pico_set_program_version(smart-tabuada "0.1")
 pico_enable_stdio_uart(smart-tabuada 0)
 pico_enable_stdio_usb(smart-tabuada 1)
 
-# Add the standard library to the build
-target_link_libraries(smart-tabuada
-        pico_stdlib)
-
 # Add the standard include files to the build
 target_include_directories(smart-tabuada PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
@@ -55,8 +51,11 @@ target_include_directories(smart-tabuada PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(smart-tabuada 
+        pico_stdlib
         hardware_i2c
-        
+        hardware_adc
+        pico_lwip_http
+        pico_cyw43_arch_lwip_threadsafe_background 
         )
 
 pico_add_extra_outputs(smart-tabuada)
