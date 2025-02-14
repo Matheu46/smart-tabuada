@@ -1,5 +1,6 @@
 // Tirar tabuada de 1
 // diminuir range da resposta errada (5 para mais e 5 para menos)
+// Melhorar a função de display oled (ta feio)
 
 #include <stdio.h>
 #include "pico/stdlib.h"
