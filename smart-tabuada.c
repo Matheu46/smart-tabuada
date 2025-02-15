@@ -1,8 +1,7 @@
-// loop de 10 questões seguidas
+// enviar para o thingspeak após as 10 seguidas
 // Tirar tabuada de 1
 // diminuir range da resposta errada (5 para mais e 5 para menos)
 // Melhorar a função de display oled (ta feio)
-// enviar para o thingspeak após as 10 seguidas
 // Acender algum led para ficar mais legal
 
 #include <stdio.h>
@@ -186,8 +185,9 @@ void LimparDisplay(uint8_t *ssd, struct render_area *frame_area) {
 }
 
 void gerar_pergunta(int *num1, int *num2, int *opcao_correta, int opcoes[2]) {
-    *num1 = (rand() % 10) + 1;
-    *num2 = (rand() % 10) + 1;
+    // Gera número de 2 a 10
+    *num1 = (rand() % 9) + 2; 
+    *num2 = (rand() % 9) + 2;
     int resultado = (*num1) * (*num2);
 
     *opcao_correta = rand() % 2;
