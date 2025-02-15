@@ -258,67 +258,77 @@ int main()
 
     srand(time(NULL));
 
-    bool iniciar = false;
-
-    while(!iniciar) {
-        display_message("Tabuada de multiplicação", "Aperte A para começar");
-        if (!gpio_get(BUTTON_A)) { // A for pressionado
-            iniciar = true;
-        }
-    }
-
-    LimparDisplay(ssd, &frame_area);
-    sleep_ms(300); // não dar conflito com a pergunta
 
     while (true) {
-        // checar botões para para a escolha da resposta
-        bool button_a_state = gpio_get(BUTTON_A);
-        bool button_b_state = gpio_get(BUTTON_B);
-
-        int num1, num2, opcao_correta, opcoes[2];
-        gerar_pergunta(&num1, &num2, &opcao_correta, opcoes);
-
-        char question[16], options[16];
-        snprintf(question, sizeof(question), "%d x %d =", num1, num2);
-        snprintf(options, sizeof(options), "A %d  |  B %d", opcoes[0], opcoes[1]);
-
-        display_message(question, options);
-
-        // Aguarda escolha do usuário
-        bool resposta = false;
-        int escolha = -1;
-
-        while(!resposta) {
+        
+        bool iniciar = false;
+        while(!iniciar) {
+            display_message("Tabuada de multiplicação", "Aperte A para começar");
             if (!gpio_get(BUTTON_A)) { // A for pressionado
-                escolha = 0;
-                resposta = true;
+                iniciar = true;
             }
-            if (!gpio_get(BUTTON_B)) { // B for pressionado
-                escolha = 1;
-                resposta = true;
-            }
-            sleep_ms(100);
         }
 
-        // Verifica se a resposta está correta
-        if (escolha == opcao_correta) {
-            display_message("Correto!", "");
-            beep(BUZZER_PIN, 300); // Bipe curto para resposta certa
-        } else {
-            display_message("Errado!", "");
-            beep(BUZZER_PIN, 1000); // Bipe longo para resposta errada
+        LimparDisplay(ssd, &frame_area);
+        sleep_ms(300); // não dar conflito com a pergunta
+
+        int acertos = 0;
+        for(int i = 0; i < 10; i++) { // uma sequência de 10 questões
+            // checar botões para para a escolha da resposta
+            bool button_a_state = gpio_get(BUTTON_A);
+            bool button_b_state = gpio_get(BUTTON_B);
+
+            int num1, num2, opcao_correta, opcoes[2];
+            gerar_pergunta(&num1, &num2, &opcao_correta, opcoes);
+
+            char question[16], options[16];
+            snprintf(question, sizeof(question), "%d x %d =", num1, num2);
+            snprintf(options, sizeof(options), "A %d  |  B %d", opcoes[0], opcoes[1]);
+
+            display_message(question, options);
+
+            // Aguarda escolha do usuário
+            bool resposta = false;
+            int escolha = -1;
+
+            while(!resposta) {
+                if (!gpio_get(BUTTON_A)) { // A for pressionado
+                    escolha = 0;
+                    resposta = true;
+                }
+                if (!gpio_get(BUTTON_B)) { // B for pressionado
+                    escolha = 1;
+                    resposta = true;
+                }
+                sleep_ms(100);
+            }
+
+            // Verifica se a resposta está correta
+            if (escolha == opcao_correta) {
+                display_message("Correto!", "");
+                beep(BUZZER_PIN, 300); // Bipe curto para resposta certa
+                acertos++;
+            } else {
+                display_message("Errado!", "");
+                beep(BUZZER_PIN, 1000); // Bipe longo para resposta errada
+            }
+
+            sleep_ms(2000);
         }
 
-        // beep(BUZZER_PIN, 500); // Bipe de 500ms
-
-        sleep_ms(2000);
+        char acertos_msg[16];
+        snprintf(acertos_msg, sizeof(acertos_msg), "%d acertos", acertos);
+        display_message(acertos_msg, "de 10");
+        sleep_ms(4000);
+        // LimparDisplay(ssd, &frame_area);
 
         // dns_gethostbyname(THINGSPEAK_HOST, &server_ip, dns_callback, NULL);
         // display_message("olha no...", "ThingSpeak!!");
         // sleep_ms(15000);
 
-        LimparDisplay(ssd, &frame_area);
     }
+    
+
 
     return 0;
 }
