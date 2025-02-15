@@ -1,7 +1,7 @@
+// loop de 10 questões seguidas
 // Tirar tabuada de 1
 // diminuir range da resposta errada (5 para mais e 5 para menos)
 // Melhorar a função de display oled (ta feio)
-// loop de 10 questões seguidas
 // enviar para o thingspeak após as 10 seguidas
 // Acender algum led para ficar mais legal
 
@@ -180,6 +180,10 @@ void display_message(char *line1, char *line2) {
     render_on_display(ssd, &frame_area);
 }
 
+void LimparDisplay(uint8_t *ssd, struct render_area *frame_area) {
+  memset(ssd, 0, ssd1306_buffer_length);
+  render_on_display(ssd, frame_area);
+}
 
 void gerar_pergunta(int *num1, int *num2, int *opcao_correta, int opcoes[2]) {
     *num1 = (rand() % 10) + 1;
@@ -229,8 +233,7 @@ int main()
 
     // zera o display inteiro
     uint8_t ssd[ssd1306_buffer_length];
-    memset(ssd, 0, ssd1306_buffer_length);
-    render_on_display(ssd, &frame_area);
+    LimparDisplay(ssd, &frame_area);
 
     init_buttons();
 
@@ -264,9 +267,7 @@ int main()
         }
     }
 
-    ssd[ssd1306_buffer_length];
-    memset(ssd, 0, ssd1306_buffer_length);
-    render_on_display(ssd, &frame_area);
+    LimparDisplay(ssd, &frame_area);
     sleep_ms(300); // não dar conflito com a pergunta
 
     while (true) {
@@ -316,10 +317,7 @@ int main()
         // display_message("olha no...", "ThingSpeak!!");
         // sleep_ms(15000);
 
-        // zera o display inteiro
-        uint8_t ssd[ssd1306_buffer_length];
-        memset(ssd, 0, ssd1306_buffer_length);
-        render_on_display(ssd, &frame_area);
+        LimparDisplay(ssd, &frame_area);
     }
 
     return 0;
