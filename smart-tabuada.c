@@ -1,6 +1,9 @@
 // Tirar tabuada de 1
 // diminuir range da resposta errada (5 para mais e 5 para menos)
 // Melhorar a função de display oled (ta feio)
+// loop de 10 questões seguidas
+// enviar para o thingspeak após as 10 seguidas
+// Acender algum led para ficar mais legal
 
 #include <stdio.h>
 #include "pico/stdlib.h"
