@@ -1,4 +1,3 @@
-// enviar para o thingspeak após as 10 seguidas
 // diminuir range da resposta errada (5 para mais e 5 para menos)
 // Melhorar a função de display oled (ta feio)
 // Acender algum led para ficar mais legal
@@ -30,8 +29,8 @@
 
 
 // Config para a conexão do wifi
-#define WIFI_SSID "d" // Nome da rede Wi-Fi
-#define WIFI_PASS "10102020"      // Senha da rede Wi-Fi
+#define WIFI_SSID "brisa-2253009" // Nome da rede Wi-Fi
+#define WIFI_PASS "wr4cmofe"      // Senha da rede Wi-Fi
 
 // Config para o Thingspeak
 #define THINGSPEAK_HOST "api.thingspeak.com"
@@ -94,52 +93,6 @@ static void init_buttons() {
     gpio_pull_up(BUTTON_B);
 }
 
-// Callback quando recebe resposta do ThingSpeak
-static err_t http_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-    if (p == NULL) {
-        tcp_close(tpcb);
-        return ERR_OK;
-    }
-    printf("Resposta do ThingSpeak: %.*s\n", p->len, (char *)p->payload);
-    pbuf_free(p);
-    return ERR_OK;
-}
-
-// Callback quando a conexão TCP é estabelecida
-static err_t http_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err) {
-    if (err != ERR_OK) {
-        printf("Erro na conexão TCP\n");
-        return err;
-    }
-
-    printf("Conectado ao ThingSpeak!\n");
-
-    float temperature = 32.5;
-    char request[256];
-    snprintf(request, sizeof(request),
-        "GET /update?api_key=%s&field1=%.2f HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "Connection: close\r\n"
-        "\r\n",
-        API_KEY, temperature, THINGSPEAK_HOST);
-
-    tcp_write(tpcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
-    tcp_output(tpcb);
-    tcp_recv(tpcb, http_recv_callback);
-
-    return ERR_OK;
-}
-
-// Resolver DNS e conectar ao servidor
-static void dns_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
-    if (ipaddr) {
-        printf("Endereço IP do ThingSpeak: %s\n", ipaddr_ntoa(ipaddr));
-        tcp_client_pcb = tcp_new();
-        tcp_connect(tcp_client_pcb, ipaddr, THINGSPEAK_PORT, http_connected_callback);
-    } else {
-        printf("Falha na resolução de DNS\n");
-    }
-}
 
 
 // I2C defines - display oled
@@ -182,6 +135,90 @@ void LimparDisplay(uint8_t *ssd, struct render_area *frame_area) {
   memset(ssd, 0, ssd1306_buffer_length);
   render_on_display(ssd, frame_area);
 }
+
+// Estrutura para armazenar os dados que vão para o thingspeak
+typedef struct {
+    int acertos;
+    int tempo_resposta;
+} request_data_t;
+
+// Callback quando recebe resposta do ThingSpeak
+static err_t http_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
+    if (p == NULL) {
+        request_data_t *dados = (request_data_t *)arg;
+        if (dados) free(dados);
+        tcp_close(tpcb);
+        return ERR_OK;
+    }
+    printf("Resposta do ThingSpeak: %.*s\n", p->len, (char *)p->payload);
+    pbuf_free(p);
+    return ERR_OK;
+}
+
+// Callback quando a conexão TCP é estabelecida
+static err_t http_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err) {
+    if (err != ERR_OK) {
+        printf("Erro na conexão TCP\n");
+        return err;
+    }
+
+    printf("Conectado ao ThingSpeak!\n");
+
+    // Recupera os dados passados como argumento
+    request_data_t *dados = (request_data_t *)arg;
+    int acertos = dados->acertos;
+    int tempo_resposta = dados->tempo_resposta;
+    
+    char valor1[16], valor2[16];
+    snprintf(valor1, sizeof(valor1), "%d acertos", acertos);
+    snprintf(valor2, sizeof(valor2), "%d segs", tempo_resposta);
+
+    display_message(valor1, valor2);
+    sleep_ms(10000);
+
+    char request[256];
+    snprintf(request, sizeof(request),
+        "GET /update?api_key=%s&field1=%d&field2=%d HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        API_KEY, acertos, tempo_resposta, THINGSPEAK_HOST);
+
+    tcp_write(tpcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
+    tcp_output(tpcb);
+    tcp_recv(tpcb, http_recv_callback);
+
+    return ERR_OK;
+}
+
+// Resolver DNS e conectar ao servidor
+static void dns_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
+    if (ipaddr) {
+        struct tcp_pcb *tcp_client_pcb = tcp_new();
+        request_data_t *dados = (request_data_t *)callback_arg;
+        printf("Endereço IP do ThingSpeak: %s\n", ipaddr_ntoa(ipaddr));
+
+        tcp_arg(tcp_client_pcb, dados);
+        tcp_connect(tcp_client_pcb, ipaddr, THINGSPEAK_PORT, http_connected_callback);
+    } else {
+        request_data_t *dados = (request_data_t *)callback_arg;
+        free(dados);
+        printf("Falha na resolução de DNS\n");
+    }
+}
+
+
+// Função para enviar dados ao ThingSpeak
+void send_to_thingspeak(int acertos, int tempo_resposta) {
+    // Prepara os dados para enviar como argumento
+    static int dados[2];
+    dados[0] = acertos;
+    dados[1] = tempo_resposta; 
+
+    // Resolve o DNS e inicia a conexão
+    dns_gethostbyname(THINGSPEAK_HOST, &server_ip, dns_callback, &dados);
+}
+
 
 void gerar_pergunta(int *num1, int *num2, int *opcao_correta, int opcoes[2]) {
     // Gera número de 2 a 10
@@ -237,20 +274,20 @@ int main()
     init_buttons();
 
     // conexão WIFI
-    // if (cyw43_arch_init()) {
-    //     printf("Falha ao iniciar Wi-Fi\n");
-    //     return 1;
-    // }
+    if (cyw43_arch_init()) {
+        printf("Falha ao iniciar Wi-Fi\n");
+        return 1;
+    }
 
-    // cyw43_arch_enable_sta_mode();
-    // printf("Conectando ao Wi-Fi...\n");
+    cyw43_arch_enable_sta_mode();
+    printf("Conectando ao Wi-Fi...\n");
 
-    // if (cyw43_arch_wifi_connect_blocking(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_MIXED_PSK)) {
-    //     printf("Falha ao conectar ao Wi-Fi\n");
-    //     return 1;
-    // }
+    if (cyw43_arch_wifi_connect_blocking(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_MIXED_PSK)) {
+        printf("Falha ao conectar ao Wi-Fi\n");
+        return 1;
+    }
 
-    // printf("Wi-Fi conectado!\n");
+    printf("Wi-Fi conectado!\n");
     // display_message("Wi-fi....", "conectado!");
 
     // sleep_ms(2000);
@@ -273,7 +310,7 @@ int main()
 
         int acertos = 0;
         uint32_t inicio_tempo = time_us_32();  // Tempo inicial p/ calcular tempo de resposta
-        for(int i = 0; i < 10; i++) { // uma sequência de 10 questões
+        for(int i = 0; i < 5; i++) { // uma sequência de 10 questões
             // checar botões para para a escolha da resposta
             bool button_a_state = gpio_get(BUTTON_A);
             bool button_b_state = gpio_get(BUTTON_B);
@@ -316,25 +353,24 @@ int main()
             sleep_ms(1000);
         }
         uint32_t fim_tempo = time_us_32();  // Marca o tempo final
-        float tempo_resposta = (fim_tempo - inicio_tempo) / 1000000.0;
+        int tempo_resposta = (fim_tempo - inicio_tempo) / 1000000;
 
         char feedback[16];
         snprintf(feedback, sizeof(feedback), "%.2f", tempo_resposta);
         display_message("Parabéns, demorou", feedback);
-        sleep_ms(10000);
+        // sleep_ms(10000);
 
         char acertos_msg[16];
         snprintf(acertos_msg, sizeof(acertos_msg), "%d acertos", acertos);
         display_message(acertos_msg, "de 10");
+        // sleep_ms(1000);
+
+        send_to_thingspeak(acertos, tempo_resposta);
+        
+        display_message("olha no...", "ThingSpeak!!");
         sleep_ms(2000);
 
-        // dns_gethostbyname(THINGSPEAK_HOST, &server_ip, dns_callback, NULL);
-        // display_message("olha no...", "ThingSpeak!!");
-        // sleep_ms(15000);
-
     }
-    
-
 
     return 0;
 }
