@@ -123,8 +123,8 @@ void display_message(char *line1, char *line2) {
     uint8_t ssd[ssd1306_buffer_length];
     memset(ssd, 0, ssd1306_buffer_length);
 
-    ssd1306_draw_string(ssd, 5, 0, line1);
-    ssd1306_draw_string(ssd, 5, 8, line2);
+    ssd1306_draw_string(ssd, 5, 20, line1);
+    ssd1306_draw_string(ssd, 5, 36, line2);
 
     render_on_display(ssd, &frame_area);
 }
@@ -288,7 +288,7 @@ int main()
         
         bool iniciar = false;
         while(!iniciar) {
-            display_message("Tabuada de multiplicação", "Aperte A para começar");
+            display_message("Aperte A", "Para iniciar");
             if (!gpio_get(BUTTON_A)) { // A for pressionado
                 iniciar = true;
             }
