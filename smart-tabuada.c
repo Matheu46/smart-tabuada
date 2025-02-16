@@ -8,38 +8,46 @@
 #include <string.h>
 #include "inc/ssd1306.h"
 #include "hardware/i2c.h"
-
 #include "pico/cyw43_arch.h"
 #include "hardware/adc.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 #include "lwip/dns.h"
 #include "lwip/init.h"
-
 #include <time.h>
-
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
 
-// Configuração do pino do buzzer
-#define BUZZER_PIN 21
-
-// Configuração da frequência do buzzer (em Hz)
-#define BUZZER_FREQUENCY 100
-
-
 // Config para a conexão do wifi
-#define WIFI_SSID "brisa-2253009" // Nome da rede Wi-Fi
-#define WIFI_PASS "wr4cmofe"      // Senha da rede Wi-Fi
+#define WIFI_SSID "brisa-2253009" // Nome
+#define WIFI_PASS "wr4cmofe"      // Senha
 
 // Config para o Thingspeak
 #define THINGSPEAK_HOST "api.thingspeak.com"
 #define THINGSPEAK_PORT 80
-
 #define API_KEY "74PC5A1Y0IQNNQEU" // API Key do ThingSpeak
+
+// Configuração do pino do buzzer
+#define BUZZER_PIN 21
+#define BUZZER_FREQUENCY 100
+
+// GPIO's do botão A e B
+#define BUTTON_A 5 
+#define BUTTON_B 6
+
+// I2C defines - display oled
+#define I2C_PORT i2c0
+const uint I2C_SDA = 14;
+const uint I2C_SCL = 15;
 
 struct tcp_pcb *tcp_client_pcb;
 ip_addr_t server_ip;
+
+// Estrutura para armazenar os dados que vão para o thingspeak
+typedef struct {
+    int acertos;
+    int tempo_resposta;
+} request_data_t;
 
 
 // Definição de uma função para inicializar o PWM no pino do buzzer
@@ -59,6 +67,29 @@ void pwm_init_buzzer(uint pin) {
     pwm_set_gpio_level(pin, 0);
 }
 
+static void init_buttons() {
+    gpio_init(BUTTON_A);
+    gpio_set_dir(BUTTON_A, GPIO_IN);
+    gpio_pull_up(BUTTON_A);
+
+    gpio_init(BUTTON_B);
+    gpio_set_dir(BUTTON_B, GPIO_IN);
+    gpio_pull_up(BUTTON_B);
+}
+
+// Função para inicializar o OLED
+void init_oled() {
+    i2c_init(i2c1, ssd1306_i2c_clock * 1000);
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_SDA);
+    gpio_pull_up(I2C_SCL);
+
+    ssd1306_init();
+}
+
+
+
 // Definição de uma função para emitir um beep com duração especificada
 void beep(uint pin, uint duration_ms) {
     // Obter o slice do PWM associado ao pino
@@ -77,39 +108,6 @@ void beep(uint pin, uint duration_ms) {
     sleep_ms(100); // Pausa de 100ms
 }
 
-
-
-
-#define BUTTON_A 5    // GPIO conectado ao Botão A
-#define BUTTON_B 6    // GPIO conectado ao Botão B
-
-static void init_buttons() {
-    gpio_init(BUTTON_A);
-    gpio_set_dir(BUTTON_A, GPIO_IN);
-    gpio_pull_up(BUTTON_A);
-
-    gpio_init(BUTTON_B);
-    gpio_set_dir(BUTTON_B, GPIO_IN);
-    gpio_pull_up(BUTTON_B);
-}
-
-
-
-// I2C defines - display oled
-#define I2C_PORT i2c0
-const uint I2C_SDA = 14;
-const uint I2C_SCL = 15;
-
-// Função para inicializar o OLED
-void init_oled() {
-    i2c_init(i2c1, ssd1306_i2c_clock * 1000);
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(I2C_SDA);
-    gpio_pull_up(I2C_SCL);
-
-    ssd1306_init();
-}
 
 // Função para exibir mensagem no OLED
 void display_message(char *line1, char *line2) {
@@ -136,11 +134,6 @@ void LimparDisplay(uint8_t *ssd, struct render_area *frame_area) {
   render_on_display(ssd, frame_area);
 }
 
-// Estrutura para armazenar os dados que vão para o thingspeak
-typedef struct {
-    int acertos;
-    int tempo_resposta;
-} request_data_t;
 
 // Callback quando recebe resposta do ThingSpeak
 static err_t http_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
@@ -254,7 +247,6 @@ int main()
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
-    // For more examples of I2C use see https://github.com/raspberrypi/pico-examples/tree/master/i2c
 
     init_oled();
     // Preparar área de renderização para o display (ssd1306_width pixels por ssd1306_n_pages páginas)
@@ -274,6 +266,8 @@ int main()
     init_buttons();
 
     // conexão WIFI
+    display_message("Wi-fi....", "conectando!");
+
     if (cyw43_arch_init()) {
         printf("Falha ao iniciar Wi-Fi\n");
         return 1;
@@ -287,13 +281,8 @@ int main()
         return 1;
     }
 
-    printf("Wi-Fi conectado!\n");
-    // display_message("Wi-fi....", "conectado!");
-
-    // sleep_ms(2000);
 
     srand(time(NULL));
-
 
     while (true) {
         
