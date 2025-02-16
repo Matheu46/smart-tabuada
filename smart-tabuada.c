@@ -1,5 +1,4 @@
 // enviar para o thingspeak após as 10 seguidas
-// Tirar tabuada de 1
 // diminuir range da resposta errada (5 para mais e 5 para menos)
 // Melhorar a função de display oled (ta feio)
 // Acender algum led para ficar mais legal
@@ -273,6 +272,7 @@ int main()
         sleep_ms(300); // não dar conflito com a pergunta
 
         int acertos = 0;
+        uint32_t inicio_tempo = time_us_32();  // Tempo inicial p/ calcular tempo de resposta
         for(int i = 0; i < 10; i++) { // uma sequência de 10 questões
             // checar botões para para a escolha da resposta
             bool button_a_state = gpio_get(BUTTON_A);
@@ -310,17 +310,23 @@ int main()
                 acertos++;
             } else {
                 display_message("Errado!", "");
-                beep(BUZZER_PIN, 1000); // Bipe longo para resposta errada
+                beep(BUZZER_PIN, 600); // Bipe longo para resposta errada
             }
 
-            sleep_ms(2000);
+            sleep_ms(1000);
         }
+        uint32_t fim_tempo = time_us_32();  // Marca o tempo final
+        float tempo_resposta = (fim_tempo - inicio_tempo) / 1000000.0;
+
+        char feedback[16];
+        snprintf(feedback, sizeof(feedback), "%.2f", tempo_resposta);
+        display_message("Parabéns, demorou", feedback);
+        sleep_ms(10000);
 
         char acertos_msg[16];
         snprintf(acertos_msg, sizeof(acertos_msg), "%d acertos", acertos);
         display_message(acertos_msg, "de 10");
-        sleep_ms(4000);
-        // LimparDisplay(ssd, &frame_area);
+        sleep_ms(2000);
 
         // dns_gethostbyname(THINGSPEAK_HOST, &server_ip, dns_callback, NULL);
         // display_message("olha no...", "ThingSpeak!!");
