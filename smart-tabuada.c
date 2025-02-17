@@ -49,6 +49,8 @@ typedef struct {
     int tempo_resposta;
 } request_data_t;
 
+// Variável para controle do envio ao ThingSpeak
+static bool enviando_thingspeak = false;
 
 // Definição de uma função para inicializar o PWM no pino do buzzer
 void pwm_init_buzzer(uint pin) {
@@ -138,9 +140,10 @@ void LimparDisplay(uint8_t *ssd, struct render_area *frame_area) {
 // Callback quando recebe resposta do ThingSpeak
 static err_t http_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     if (p == NULL) {
-        request_data_t *dados = (request_data_t *)arg;
-        if (dados) free(dados);
+        // request_data_t *dados = (request_data_t *)arg;
+        // if (dados) free(dados);
         tcp_close(tpcb);
+        enviando_thingspeak = false; // Libera o envio
         return ERR_OK;
     }
     printf("Resposta do ThingSpeak: %.*s\n", p->len, (char *)p->payload);
@@ -152,6 +155,7 @@ static err_t http_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
 static err_t http_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err) {
     if (err != ERR_OK) {
         printf("Erro na conexão TCP\n");
+        enviando_thingspeak = false; // Libera o envio
         return err;
     }
 
@@ -161,13 +165,6 @@ static err_t http_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
     request_data_t *dados = (request_data_t *)arg;
     int acertos = dados->acertos;
     int tempo_resposta = dados->tempo_resposta;
-    
-    char valor1[16], valor2[16];
-    snprintf(valor1, sizeof(valor1), "%d acertos", acertos);
-    snprintf(valor2, sizeof(valor2), "%d segs", tempo_resposta);
-
-    display_message(valor1, valor2);
-    sleep_ms(10000);
 
     char request[256];
     snprintf(request, sizeof(request),
@@ -197,18 +194,22 @@ static void dns_callback(const char *name, const ip_addr_t *ipaddr, void *callba
         request_data_t *dados = (request_data_t *)callback_arg;
         free(dados);
         printf("Falha na resolução de DNS\n");
+        enviando_thingspeak = false; // Libera o envio
     }
 }
 
 
 // Função para enviar dados ao ThingSpeak
 void send_to_thingspeak(int acertos, int tempo_resposta) {
+    if (enviando_thingspeak) return; // Evita múltiplos envios simultâneos
+
     // Prepara os dados para enviar como argumento
     static int dados[2];
     dados[0] = acertos;
     dados[1] = tempo_resposta; 
 
     // Resolve o DNS e inicia a conexão
+    enviando_thingspeak = true;
     dns_gethostbyname(THINGSPEAK_HOST, &server_ip, dns_callback, &dados);
 }
 
@@ -299,7 +300,7 @@ int main()
 
         int acertos = 0;
         uint32_t inicio_tempo = time_us_32();  // Tempo inicial p/ calcular tempo de resposta
-        for(int i = 0; i < 5; i++) { // uma sequência de 10 questões
+        for(int i = 0; i < 5; i++) { // uma sequência de 5 questões
             // checar botões para para a escolha da resposta
             bool button_a_state = gpio_get(BUTTON_A);
             bool button_b_state = gpio_get(BUTTON_B);
@@ -344,21 +345,22 @@ int main()
         uint32_t fim_tempo = time_us_32();  // Marca o tempo final
         int tempo_resposta = (fim_tempo - inicio_tempo) / 1000000;
 
-        char feedback[16];
-        snprintf(feedback, sizeof(feedback), "%.2f", tempo_resposta);
-        display_message("Parabéns, demorou", feedback);
-        // sleep_ms(10000);
-
-        char acertos_msg[16];
-        snprintf(acertos_msg, sizeof(acertos_msg), "%d acertos", acertos);
-        display_message(acertos_msg, "de 10");
-        // sleep_ms(1000);
-
         send_to_thingspeak(acertos, tempo_resposta);
-        
-        display_message("olha no...", "ThingSpeak!!");
-        sleep_ms(2000);
+        sleep_ms(1000);  
 
+        // Verifica se o envio foi concluído
+        if (!enviando_thingspeak) {
+            printf("Envio concluído. Pronto para o próximo ciclo.\n");
+        } else {
+            printf("Envio em andamento...\n");
+        }
+
+        char valor1[16], valor2[16];
+        snprintf(valor1, sizeof(valor1), "%d acertos", acertos);
+        snprintf(valor2, sizeof(valor2), "%d segs", tempo_resposta);
+
+        display_message(valor1, valor2);
+        sleep_ms(8000);
     }
 
     return 0;
